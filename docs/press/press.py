@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
-"""The Foresight Wing press: prints the newspaper pages that README.md shows.
+"""The Foresight Wing press: prints the README as a newspaper.
 
 A special edition from the FOSSiNtellect presses (github.com/FOSSiNtellect), set in the same type. It reads
-edition.toml and prints docs/readme/*.svg, plus a night edition of each page for GitHub's dark theme in
-docs/readme/dark/. README.md itself is written by hand. Standard library only, so it runs anywhere Python 3.11+ does.
+edition.md (the articles) and edition.toml (the front page, newsreel, diagrams and classifieds), prints every page
+as docs/readme/*.svg plus a night edition for GitHub's dark theme in docs/readme/dark/, and writes README.md: the
+pages in order, then the same words as a plain-text edition. Standard library only, so it runs anywhere Python 3.11+
+does. The moving newsreel is printed separately from the demo video by newsreel.py.
 
     python docs/press/press.py
 """
 from __future__ import annotations
 
 import base64
+import html
 import json
 import math
 import random
+import re
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -22,6 +26,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PRESS = ROOT / "docs" / "press"
 FONTS = PRESS / "fonts"
 OUT = ROOT / "docs" / "readme"
+README = ROOT / "README.md"
 
 W = 840  # every page is drawn on an 840-unit canvas, the width of GitHub's README column
 # The day edition is printed in black and white; only the margin notes are in pen.
@@ -63,6 +68,10 @@ def _load_faces() -> dict[str, Face]:
 
 FACES = _load_faces()
 R, B, I, H = (FACES[k] for k in ("serif", "serif-bold", "serif-italic", "hand"))
+# Code is set in the reader's own monospace (Consolas, Menlo…), a size smaller than the text around it.
+MONO_SCALE = 0.86
+CHAR = 0.55  # a monospace character is about 0.55 em wide
+M = Face("mono", "m", 1000, 0.66, {"n": round(CHAR * 1000 * MONO_SCALE)})
 
 FONT_RULES = {
     "serif": ("OldStandard", "normal", "normal"),
@@ -76,7 +85,8 @@ BASE_CSS = (
     ".r{font-family:OldStandard,Georgia,serif}"
     ".b{font-family:OldStandard,Georgia,serif;font-weight:700}"
     ".i{font-family:OldStandard,Georgia,serif;font-style:italic}"
-    '.h{font-family:Caveat,"Segoe Print","Bradley Hand",cursive;font-kerning:normal}' % INK
+    '.h{font-family:Caveat,"Segoe Print","Bradley Hand",cursive;font-kerning:normal}'
+    '.m{font-family:Consolas,"Cascadia Mono",Menlo,"Courier New",monospace;white-space:pre}' % INK
 )
 
 
@@ -117,6 +127,59 @@ def words_of(text: str, face: Face) -> list[Word]:
     return [(w, face) for w in text.split()]
 
 
+INLINE = re.compile(r"\*\*(.+?)\*\*|`([^`]+)`|\*(.+?)\*|\[([^\]]+)\]\([^)]+\)")
+
+
+def _pieces(text: str, base: Face) -> list[tuple[str, Face]]:
+    """Runs of text with their faces; bold and italic runs may hold `code` or links of their own."""
+    out, pos = [], 0
+    for m in INLINE.finditer(text):
+        out.append((text[pos:m.start()], base))
+        bold, code, italic, link = m.groups()
+        if bold is not None:
+            out += _pieces(bold, B)
+        elif code is not None:
+            out.append((code, M))
+        elif italic is not None:
+            out += _pieces(italic, I if base is not I else R)
+        else:
+            out += _pieces(link, base)
+        pos = m.end()
+    out.append((text[pos:], base))
+    return out
+
+
+def rich(text: str, base: Face = R) -> list[Word]:
+    """Words of a line of Markdown: **bold**, *italic*, `code` and [links] keep their face (links print as text)."""
+    words: list[Word] = []
+    glue = False  # whether the next piece continues the last word (no space between them)
+
+    def add(piece: str, face: Face):
+        nonlocal glue
+        for k, part in enumerate(piece.split(" ")):
+            if k:
+                glue = False
+            if not part:
+                continue
+            if glue and words:
+                prev, prev_face = words[-1]
+                # punctuation joins the word it touches, in that word's face
+                face_of = face if not any(ch.isalnum() for ch in prev) else prev_face
+                words[-1] = (prev + part, face_of)
+            else:
+                words.append((part, face))
+            glue = True
+
+    for piece, face in _pieces(text, base):
+        add(piece, face)
+    return words
+
+
+def plain(text: str) -> str:
+    """The words of a line of Markdown without its markup."""
+    return " ".join(w for w, _ in rich(text))
+
+
 VOWELS = set("aeiouy")
 UNSPLIT = {"th", "ch", "sh", "ph", "wh", "gh", "ck"}
 
@@ -142,7 +205,7 @@ def hyphen_points(word: str) -> list[int]:
 def break_lines(words: list[Word], size: float, width_for, hyphenate=False) -> list[list[Word]]:
     """Greedy line breaking; width_for(n) is the measure available to line n.
 
-    With hyphenate, a word that would leave a loose line is split across it.
+    With hyphenate, a word that would leave a loose line is split across it (never code).
     """
     space = R.width(" ", size)
     lines: list[list[Word]] = []
@@ -154,7 +217,7 @@ def break_lines(words: list[Word], size: float, width_for, hyphenate=False) -> l
         ww = word[1].width(word[0], size)
         limit = width_for(len(lines))
         if line and used + space + ww > limit:
-            if hyphenate and limit - used > space * 1.6:
+            if hyphenate and word[1] is not M and limit - used > space * 1.6:
                 text, face = word
                 for i in hyphen_points(text):
                     head = text[:i] if text[i - 1] == "-" else text[:i] + "-"
@@ -275,10 +338,15 @@ class Page:
         x -= {"start": 0, "middle": total / 2, "end": total}[anchor]
         spans = []
         for (w, f), ww in zip(line, widths):
-            spans.append(f'<tspan x="{x:.1f}" class="{f.css}">{escape(w)}</tspan>')
+            smaller = f' font-size="{size * MONO_SCALE:.2f}"' if f is M else ""
+            spans.append(f'<tspan x="{x:.1f}" class="{f.css}"{smaller}>{escape(w)}</tspan>')
             x += ww + gap
         color = f' fill="{fill}"' if fill != INK else ""
         self.add(f'<text y="{y:.1f}" font-size="{size:g}"{color}>{"".join(spans)}</text>')
+
+    def code(self, x, y, text, size):
+        """One line of code, spaces kept."""
+        self.add(f'<text x="{x:.1f}" y="{y:.1f}" class="m" font-size="{size:g}" xml:space="preserve">{escape(text)}</text>')
 
     def rule(self, x1, y, x2, weight=0.8, dash=None, color=INK):
         extra = f' stroke-dasharray="{dash}" stroke-linecap="round"' if dash else ""
@@ -311,13 +379,6 @@ class Page:
             NIGHT_PHOTOS[data] = base64.b64encode(night.read_bytes()).decode()
         self.add(f'<image x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h:.1f}" preserveAspectRatio="xMidYMid slice" '
                  f'href="data:image/jpeg;base64,{data}"/>')
-
-    def play_button(self, cx, cy, r):
-        self.add(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r:.1f}" fill="{INK}" fill-opacity=".86"/>')
-        self.add(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r - 4:.1f}" fill="none" stroke="{PAPER_TONES[0]}" stroke-width="1.2"/>')
-        s = r * 0.46
-        pts = [(cx - s * 0.7, cy - s), (cx - s * 0.7, cy + s), (cx + s, cy)]
-        self.add(f'<polygon points="{" ".join(f"{px:.1f},{py:.1f}" for px, py in pts)}" fill="{PAPER_TONES[0]}"/>')
 
     def note(self, x, y, text, size=23, tilt=-3.0, anchor="start") -> float:
         """A handwritten margin note in blue pen. Returns its width."""
@@ -354,7 +415,7 @@ class Page:
 
     def render(self, height: float, *, title: str, rotate: float = 0.0) -> str:
         fonts = []
-        for key in sorted(self.used):
+        for key in sorted(self.used & FONT_RULES.keys()):  # code uses the reader's own monospace
             family, weight, style = FONT_RULES[key]
             data = base64.b64encode((FONTS / f"{key}.woff2").read_bytes()).decode()
             fonts.append(f'@font-face{{font-family:{family};font-weight:{weight};font-style:{style};'
@@ -553,7 +614,7 @@ def front_page(ed: dict) -> str:
     return page.render(y + 12, title=f"{paper['title']}: {lead['headline']}")
 
 
-# ── Inside pages ────────────────────────────────────────────────────────
+# ── Special inside pages ────────────────────────────────────────────────
 
 def section_banner(title: str, subtitle: str, seed: int) -> str:
     page = Page()
@@ -568,7 +629,12 @@ def section_banner(title: str, subtitle: str, seed: int) -> str:
     return page.render(76, title=title)
 
 
+NEWSREEL_PHOTO: tuple[float, float, float, float] = (0, 0, 0, 0)  # where newsreel.py plays the demo: x, y, w, h
+
+
 def newsreel(ed: dict) -> str:
+    """The newsreel clipping, with a still in its photo. newsreel.py prints the same page with the demo playing."""
+    global NEWSREEL_PHOTO
     reel, notes = ed["newsreel"], ed.get("notes", {})
     page = Page()
     x0, x1 = 40, W - 40
@@ -576,19 +642,19 @@ def newsreel(ed: dict) -> str:
     page.text(x0, 46, reel["kicker"], B, 10, fill=ACCENT, tracking=2.4)
     page.text(x1, 46, reel["label"], B, 9.5, anchor="end", tracking=1.6)
     page.rule(x0, 55, x1, 0.9)
-    y = headline(page, mid, 68, reel["headline"], cw, 30, 22) + 18
+    y = round(headline(page, mid, 68, reel["headline"], cw, 30, 22) + 18)
 
-    ph = cw * 9 / 16
+    ph = round(cw * 9 / 16)
     page.photo(x0, y, cw, ph, PRESS / "newsreel.jpg", night=PRESS / "newsreel-night.jpg")
     page.box(x0, y, cw, ph, 1.4)
     page.box(x0 - 4, y - 4, cw + 8, ph + 8, 0.6)
-    page.play_button(mid, y + ph / 2 - 20, 38)
-    if notes.get("newsreel"):  # the player itself sits just under this page in the README
-        nw = page.note(mid + 70, y + ph / 2 + 58, notes["newsreel"], 26, tilt=-4)
-        page.arrow(mid + 70 + nw * 0.6, y + ph / 2 + 66, mid + 70 + nw * 0.75, y + ph - 14, bend=-0.25)
+    NEWSREEL_PHOTO = (x0, y, cw, ph)
     y += ph + 12
     page.text(x1, y + 6, f"PHOTO: {reel['credit']}", B, 8.5, anchor="end", fill=INK_SOFT, tracking=1.2)
-    y += 26
+    if notes.get("newsreel"):
+        nw = page.note(x0 + 2, y + 18, notes["newsreel"], 22, tilt=-2)
+        page.arrow(x0 + nw + 10, y + 6, x0 + nw + 50, y - 5, bend=0.35)  # stops under the frame: the film plays inside
+    y += 44
     lines = break_lines(words_of(reel["caption"], I), 13.5, lambda _: cw, hyphenate=True)
     for k, ln in enumerate(lines):
         page.line(ln, x0, y + k * 18.5, 13.5, justify_to=None if k == len(lines) - 1 else cw)
@@ -598,7 +664,7 @@ def newsreel(ed: dict) -> str:
     page.text(x1, y + 18, reel["action"], B, 10, anchor="end", tracking=1.6)
     y += 34
     page.sheet(16, 14, W - 32, y - 14 + 8, seed=30, tone=PAPER_TONES[1])
-    return page.render(y + 22, title=reel["headline"], rotate=-0.3)
+    return page.render(y + 22, title=reel["headline"])
 
 
 def architecture(ed: dict) -> str:
@@ -705,6 +771,8 @@ class Ad:
     sub: str
     body: str
     contact: str
+    link: str
+    plain: str  # how the plain-text edition names it
 
 
 def ad_clipping(ad: Ad, n: int) -> str:
@@ -725,6 +793,11 @@ def ad_clipping(ad: Ad, n: int) -> str:
     return page.render(ch, title=f"{ad.head} {ad.sub}", rotate=(0.6, -0.5, 0.3, -0.7)[n % 4])
 
 
+def classified_ads(ed: dict) -> list[Ad]:
+    return [Ad(Path(link).stem.lower(), head, sub, body, contact, link, plain_name)
+            for head, sub, body, contact, link, plain_name in ed["classifieds"]["ads"]]
+
+
 def colophon(ed: dict) -> str:
     col = ed["colophon"]
     page = Page()
@@ -735,22 +808,507 @@ def colophon(ed: dict) -> str:
     return page.render(56, title="Colophon")
 
 
+# ── The copy desk: edition.md ───────────────────────────────────────────
+
+@dataclass
+class Block:
+    kind: str       # h3, h4, p, ul, ol, table, code
+    data: object
+    source: str     # the Markdown it came from, for the plain-text edition
+
+
+@dataclass
+class Article:
+    headline: str
+    deck: str = ""
+    blocks: list[Block] = field(default_factory=list)
+
+
+STARTS_BLOCK = re.compile(r"(#|```|\||- |\d+\. |\{\{)")
+
+
+def parse_edition(text: str) -> list[tuple]:
+    """edition.md as a list of ("directive", name), ("banner", title, subtitle) and ("article", Article)."""
+    lines = re.sub(r"<!--.*?-->", "", text, flags=re.S).split("\n")
+    elements: list[tuple] = []
+    art: Article | None = None
+    i = 0
+    while i < len(lines):
+        line, s = lines[i], lines[i].strip()
+        if not s:
+            i += 1
+            continue
+        directive = re.fullmatch(r"\{\{(\w+)\}\}", s)
+        if directive:
+            elements.append(("directive", directive.group(1)))
+            art, i = None, i + 1
+            continue
+        if s.startswith("# "):
+            title, _, subtitle = s[2:].partition("|")
+            elements.append(("banner", title.strip(), subtitle.strip()))
+            art, i = None, i + 1
+            continue
+        if s.startswith("## "):
+            art = Article(s[3:].strip())
+            elements.append(("article", art))
+            i += 1
+            if i < len(lines) and lines[i].startswith("> "):
+                art.deck, i = lines[i][2:].strip(), i + 1
+            continue
+        if art is None:
+            raise SystemExit(f"edition.md: text outside an article: {s[:60]!r}")
+        if s.startswith("#### ") or s.startswith("### "):
+            kind = "h4" if s.startswith("#### ") else "h3"
+            art.blocks.append(Block(kind, s.split(" ", 1)[1].strip(), line))
+            i += 1
+        elif s.startswith("```"):
+            j = i + 1
+            while not lines[j].startswith("```"):
+                j += 1
+            art.blocks.append(Block("code", lines[i + 1:j], "\n".join(lines[i:j + 1])))
+            i = j + 1
+        elif s.startswith("|"):
+            j = i
+            while j < len(lines) and lines[j].strip().startswith("|"):
+                j += 1
+            rows = [[c.strip() for c in r.strip().strip("|").split("|")] for r in lines[i:j]]
+            art.blocks.append(Block("table", (rows[0], rows[2:]), "\n".join(lines[i:j])))
+            i = j
+        elif re.match(r"\s*- ", line):
+            j, items = i, []
+            while j < len(lines) and re.match(r"\s*- ", lines[j]):
+                m = re.match(r"(\s*)- (.*)", lines[j])
+                items.append((1 + len(m.group(1)) // 2, m.group(2)))
+                j += 1
+            art.blocks.append(Block("ul", items, "\n".join(lines[i:j])))
+            i = j
+        elif re.match(r"\d+\. ", s):
+            j, items = i, []
+            while j < len(lines) and re.match(r"\d+\. ", lines[j].strip()):
+                items.append(re.sub(r"^\d+\. ", "", lines[j].strip()))
+                j += 1
+            art.blocks.append(Block("ol", items, "\n".join(lines[i:j])))
+            i = j
+        else:
+            j = i
+            while j < len(lines) and lines[j].strip() and not STARTS_BLOCK.match(lines[j].strip()):
+                j += 1
+            art.blocks.append(Block("p", " ".join(x.strip() for x in lines[i:j]), "\n".join(lines[i:j])))
+            i = j
+    return elements
+
+
+# ── Article pages ───────────────────────────────────────────────────────
+
+TEXT = 12.0             # body type
+TEXT_LEAD = 16.4
+CODE = 10.6             # code type, before it is fitted to its measure
+CODE_LEAD = 14.8
+COL_GAP = 28
+
+
+@dataclass
+class Item:
+    """One piece of a column: a line, a heading, a code box or a space. draw(page, x, y) sets it at top y."""
+    h: float
+    draw: object
+    keep: bool = False   # never end a column on it (headings stay with their text)
+    space: bool = False  # dropped at the top of a column
+    opens: bool = True   # the first line of its paragraph (or not a text line at all)
+    closes: bool = True  # the last line of its paragraph
+
+
+def _lines(words: list[Word], width: float, indent=0.0, first=None, justify=True) -> list[Item]:
+    broken = break_lines(words, TEXT, lambda _: width - indent, hyphenate=True)
+    items = []
+    for k, ln in enumerate(broken):
+        last = k == len(broken) - 1
+
+        def draw(page, x, y, ln=ln, last=last, k=k):
+            base = y + TEXT_LEAD * 0.74
+            if k == 0 and first:
+                first(page, x, base)
+            page.line(ln, x + indent, base, TEXT, justify_to=None if last or not justify else width - indent)
+        items.append(Item(TEXT_LEAD, draw, opens=k == 0, closes=last))
+    return items
+
+
+def _space(h: float) -> Item:
+    return Item(h, lambda page, x, y: None, space=True)
+
+
+def code_size(lines: list[str], width: float) -> float:
+    longest = max((len(ln) for ln in lines), default=1)
+    return min(CODE, (width - 22) / (CHAR * longest))
+
+
+def _code_box(page: Page, x, y, w, lines: list[str], size: float) -> float:
+    lead = size * 1.4
+    h = len(lines) * lead + 16
+    page.box(x, y, w, h, 0.8)
+    for k, ln in enumerate(lines):
+        page.code(x + 11, y + 8 + lead * 0.78 + k * lead, ln, size)
+    return h
+
+
+def flow_items(blocks: list[Block], width: float) -> list[Item]:
+    """The column pieces of a run of narrow blocks, set to a column `width` wide."""
+    items: list[Item] = []
+    for b in blocks:
+        if b.kind == "h3":
+            words = rich(b.data, B)
+            if items:
+                items.append(_space(10))
+
+            def draw(page, x, y, words=words):
+                page.line(words, x, y + 17, 15.5)
+                page.rule(x, y + 25, x + 32, 1.4)
+            items.append(Item(34, draw, keep=True))
+        elif b.kind == "h4":
+            words = rich(b.data, B)
+            if items:
+                items.append(_space(6))
+            items.append(Item(20, lambda page, x, y, words=words: page.line(words, x, y + 14, 13.2), keep=True))
+        elif b.kind == "p":
+            items += _lines(rich(b.data), width)
+            items.append(_space(8))
+        elif b.kind == "ul":
+            for level, text in b.data:
+                indent = 15 if level == 1 else 30
+                mark = "•" if level == 1 else "–"
+                items += _lines(rich(text), width, indent,
+                                first=lambda page, x, base, mark=mark, indent=indent: page.text(x + indent - 12, base, mark, R, TEXT))
+                items.append(_space(3))
+            items.append(_space(5))
+        elif b.kind == "ol":
+            for n, text in enumerate(b.data, 1):
+                items += _lines(rich(text), width, 19,
+                                first=lambda page, x, base, n=n: page.text(x, base, f"{n}.", B, TEXT))
+                items.append(_space(3))
+            items.append(_space(5))
+        elif b.kind == "code":
+            size = code_size(b.data, width)
+            h = len(b.data) * size * 1.4 + 16
+            items.append(Item(h + 4, lambda page, x, y, lines=b.data, size=size, w=width: _code_box(page, x, y, w, lines, size)))
+            items.append(_space(8))
+    while items and items[-1].space:
+        items.pop()
+    return items
+
+
+def _split(items: list[Item]) -> int:
+    """Where the first column ends, so both columns run about as deep, without a lone line on either side."""
+    total = sum(it.h for it in items)
+    best, best_k, acc = None, len(items), 0.0
+    for k in range(1, len(items)):
+        acc += items[k - 1].h
+        if items[k - 1].keep or items[k - 1].space:
+            continue
+        rest = items[k:]
+        while rest and rest[0].space:
+            rest = rest[1:]
+        if not rest:
+            continue
+        orphan = items[k - 1].opens and not items[k - 1].closes   # a paragraph's first line, left behind
+        widow = rest[0].closes and not rest[0].opens               # its last line, carried over alone
+        deepest = max(acc, sum(it.h for it in rest)) + (TEXT_LEAD * 2 if orphan or widow else 0)
+        if best is None or deepest < best:
+            best, best_k = deepest, k
+    if best is None or best >= total:
+        return len(items)
+    return best_k
+
+
+def _set_column(page: Page, items: list[Item], x, y) -> float:
+    while items and items[0].space:
+        items = items[1:]
+    top = y
+    for it in items:
+        it.draw(page, x, y)
+        y += it.h
+    return y - top
+
+
+def set_flow(page: Page, blocks: list[Block], x0, y, width) -> float:
+    """Sets a run of text in two balanced columns (or across the page, if it is short). Returns the new y."""
+    whole = flow_items(blocks, width)
+    if sum(it.h for it in whole) <= 3.5 * TEXT_LEAD:
+        return y + _set_column(page, whole, x0, y) + 6
+    colw = (width - COL_GAP) / 2
+    items = flow_items(blocks, colw)
+    k = _split(items)
+    left = _set_column(page, items[:k], x0, y)
+    right = _set_column(page, items[k:], x0 + colw + COL_GAP, y)
+    depth = max(left, right)
+    page.vrule(x0 + colw + COL_GAP / 2, y + 2, y + depth - 4)
+    return y + depth + 6
+
+
+def set_table(page: Page, header: list[str], rows: list[list[str]], x0, y, width) -> float:
+    """A table set like a newspaper's listings: small-caps heads, dotted rows, columns sized to their text."""
+    size, lead, pad = 11.2, 15.0, 7
+    cells = [[rich(c) for c in row] for row in rows]
+    n = len(header)
+    longest = [max((f.width(w, size) for row in cells for w, f in row[c]), default=30) for c in range(n)]
+    heads = [words_of(h.upper(), B) for h in header]
+    head_word = [max(B.width(w, 8.8, 1.3) for w, _ in hd) for hd in heads]
+    mins = [max(lw, hw) + 2 * pad for lw, hw in zip(longest, head_word)]
+    natural = [sum(line_width(row[c], size) for row in cells) / max(1, len(cells)) for c in range(n)]
+    weights = [max(v, 10) ** 0.8 for v in natural]
+    spare = width - sum(mins)
+    if spare > 0:
+        widths = [m + spare * wt / sum(weights) for m, wt in zip(mins, weights)]
+    else:
+        widths = [m * width / sum(mins) for m in mins]
+    xs = [x0 + sum(widths[:c]) for c in range(n)]
+
+    def wrap_head(words: list[str], measure: float) -> list[str]:  # tracked caps, measured with their tracking
+        lines = [""]
+        for w in words:
+            trial = f"{lines[-1]} {w}".strip()
+            if lines[-1] and B.width(trial, 8.8, 1.3) > measure:
+                lines.append(w)
+            else:
+                lines[-1] = trial
+        return lines
+
+    head_lines = [wrap_head([w for w, _ in hd], widths[c] - 2 * pad) for c, hd in enumerate(heads)]
+    hh = max(len(hl) for hl in head_lines) * 11.5
+    page.rule(x0, y, x0 + width, 1.4)
+    for c, hl in enumerate(head_lines):
+        for k, ln in enumerate(hl):
+            page.text(xs[c] + pad, y + 14 + k * 11.5, ln, B, 8.8, tracking=1.3)
+    y += hh + 9
+    page.rule(x0, y, x0 + width, 0.8)
+    y += 4
+    for r, row in enumerate(cells):
+        broken = [break_lines(row[c], size, lambda _, c=c: widths[c] - 2 * pad, hyphenate=True) for c in range(n)]
+        h = max(len(b) for b in broken) * lead
+        for c, b in enumerate(broken):
+            for k, ln in enumerate(b):
+                page.line(ln, xs[c] + pad, y + lead * 0.78 + k * lead, size)
+        y += h + 7
+        if r < len(cells) - 1:
+            page.rule(x0, y - 3, x0 + width, 0.6, dash="0.6 2.6")
+    page.rule(x0, y, x0 + width, 1.4)
+    return y + 18
+
+
+def is_wide(b: Block, colw: float) -> bool:
+    if b.kind == "table":
+        return True
+    return b.kind == "code" and code_size(b.data, colw) < 9.4
+
+
+def article_page(art: Article, section: str, folio: str, seed: int) -> str:
+    page = Page()
+    x0, x1 = 40, W - 40
+    cw, mid = x1 - x0, W / 2
+    page.text(x0, 42, section, B, 9.5, tracking=2.2)
+    page.text(x1, 42, folio, B, 9.5, anchor="end", tracking=2.2)
+    page.rule(x0, 51, x1, 0.9)
+    y = headline(page, mid, 66, art.headline.upper(), cw, 32, 22) + 20
+    if art.deck:
+        y = centred_deck(page, mid, y, art.deck, cw * 0.84, 15) + 20
+    page.rule(x0, y, x1, 0.8)
+    page.rule(x0, y + 3.8, x1, 2.4)
+    y += 28
+
+    colw = (cw - COL_GAP) / 2
+    run: list[Block] = []
+    for b in art.blocks + [None]:
+        if b is not None and not is_wide(b, colw):
+            run.append(b)
+            continue
+        heads = []
+        while b is not None and run and run[-1].kind in ("h3", "h4"):  # a subhead goes above its table, not beside it
+            heads.insert(0, run.pop())
+        if run:
+            y = set_flow(page, run, x0, y, cw)
+            run = []
+        if heads:
+            y = set_flow(page, heads, x0, y, cw) - 2
+        if b is None:
+            break
+        if b.kind == "table":
+            y = set_table(page, *b.data, x0, y + 2, cw)
+        else:
+            size = code_size(b.data, cw)
+            y += _code_box(page, x0, y + 2, cw, b.data, size) + 16
+    page.sheet(12, 12, W - 24, y - 12, seed=seed, tone=PAPER_TONES[seed % len(PAPER_TONES)])
+    return page.render(y + 14, title=f"{art.headline}. {art.deck}".strip(". "))
+
+
+# ── README: the pages in order, then the plain-text edition ─────────────
+
+def attr(s: str) -> str:
+    return html.escape(s, quote=True)
+
+
+def picture(name: str, width: str, alt: str, href: str | None = None) -> str:
+    """A page that GitHub swaps for its night edition under the dark theme."""
+    tag = (f'<picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/dark/{name}">'
+           f'<img src="docs/readme/{name}" width="{width}" alt="{attr(alt)}"></picture>')
+    return f'<a href="{attr(href)}">{tag}</a>' if href else tag
+
+
+def slug(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+
+
+SMALL_WORDS = {"a", "an", "and", "the", "of", "in", "on", "to", "for", "from", "with"}
+
+
+def heading_case(caps: str) -> str:
+    """BEFORE YOU BEGIN → Before You Begin, keeping small words small."""
+    words = caps.lower().split()
+    return " ".join(w if n and w in SMALL_WORDS else w[:1].upper() + w[1:] for n, w in enumerate(words))
+
+
+def lower_first(s: str) -> str:
+    """Lower-cases a sentence's first letter, but not a word that is capitals throughout (SQLite, AES)."""
+    return s if len(s) > 1 and s[1].isupper() else s[:1].lower() + s[1:]
+
+
+def plain_front(ed: dict) -> list[str]:
+    paper, lead, staff = ed["paper"], ed["lead"], ed["staff"]
+    return [
+        f"### {paper['title']}",
+        f"*{paper['motto']}* · {paper['plain_line']}",
+        "",
+        f"#### {lead['headline']}",
+        f"*{lead['deck']}.*",
+        "",
+        f"**{lead['byline']}**",
+        "",
+        *[line for para in lead["story"] for line in (para, "")],
+        "**On the staff:** " + " · ".join(f"{m['name']} ({m['beat']})" for m in staff["members"]),
+        "",
+        "**The figures:** " + " · ".join(ed["figures"]["items"]),
+        "",
+    ]
+
+
+def plain_architecture(ed: dict) -> list[str]:
+    a = ed["architecture"]
+    label = lambda caps: caps.split("· ")[-1].capitalize()  # "2 · THE APP" → "The app"
+    out = [f"**{a['headline']}** {a['deck']}.", ""]
+    out.append("- **What comes in:** " + "; ".join(f"{lower_first(i['title'])} ({i['body']})" for i in a["inputs"]) + ".")
+    out.append(f"- **{label(a['window']['label'])}:** {a['window']['title']}. {a['window']['body']}")
+    out.append(f"- **{label(a['app_label'])}** ({a['app_note']}): "
+               + "; ".join(f"{lower_first(d['title'])} (`{d['files'].split(' ')[0]}`): {lower_first(d['body']).rstrip('.')}"
+                           for d in a["desks"]) + ".")
+    out.append(f"- **{label(a['models_label'])}:** " + " ".join(f"{m['title']}: {m['body']}" for m in a["models"]))
+    out.append(f"- **{label(a['doors_title'])}:** {a['doors']}")
+    return out + [""]
+
+
+def plain_pipelines(ed: dict) -> list[str]:
+    out = []
+    for strip in ed["pipelines"]["lines"]:
+        out.append(f"**{strip['title'].capitalize()}:** "
+                   + " → ".join(f"{t.capitalize()} ({lower_first(b).rstrip('.')})" for t, b in strip["steps"]) + ".")
+        out.append("")
+    return out
+
+
+def plain_edition(ed: dict, elements: list[tuple]) -> list[str]:
+    out: list[str] = []
+    for el in elements:
+        if el[0] == "banner":
+            out += ["---", "", f"## {heading_case(el[1])}", f"*{el[2]}*", ""]
+        elif el[0] == "article":
+            art = el[1]
+            out += [f"### {art.headline}", ""] + ([f"*{art.deck}.*", ""] if art.deck else [])
+            for b in art.blocks:
+                src = b.source
+                if b.kind in ("h3", "h4"):
+                    src = "#" + src.lstrip()
+                out += [src, ""]
+        elif el[1] == "front":
+            out += plain_front(ed)
+        elif el[1] == "newsreel":
+            out += [f"**The newsreel** ({ed['newsreel']['kicker'].split('· ')[1].lower()}): {ed['newsreel']['caption']}", ""]
+        elif el[1] == "architecture":
+            out += plain_architecture(ed)
+        elif el[1] == "pipelines":
+            out += plain_pipelines(ed)
+        elif el[1] == "classifieds":
+            out += ["**Classifieds:** " + " · ".join(f"[{ad.plain}]({ad.link})" for ad in classified_ads(ed)), ""]
+    while out and not out[-1]:
+        out.pop()
+    return out
+
+
 # ── Main ────────────────────────────────────────────────────────────────
 
 def main():
     ed = tomllib.loads((PRESS / "edition.toml").read_text(encoding="utf-8"))
-    pages = {"front-page.svg": front_page(ed), "newsreel.svg": newsreel(ed),
-             "architecture.svg": architecture(ed), "pipelines.svg": pipelines(ed), "colophon.svg": colophon(ed)}
-    for n, (slug, (title, subtitle)) in enumerate(ed["sections"].items()):
-        pages[f"section-{slug}.svg"] = section_banner(title, subtitle, 90 + n)
-    for n, (head, sub, body, contact, link) in enumerate(ed["classifieds"]["ads"]):
-        slug = Path(link).stem.lower()
-        pages[f"ad-{slug}.svg"] = ad_clipping(Ad(slug, head, sub, body, contact), n)
+    elements = parse_edition((PRESS / "edition.md").read_text(encoding="utf-8"))
+    ads = classified_ads(ed)
+    pages: dict[str, str] = {}
+    layout: list[list[str]] = []  # README rows: each row a list of <picture> tags, side by side
+    gif = (OUT / "newsreel.gif").exists() and (OUT / "dark" / "newsreel.gif").exists()
+
+    section, letter, number, seed = "", "A", 1, 100
+    for el in elements:
+        if el[0] == "banner":
+            _, title, subtitle = el
+            name = f"section-{slug(title)}.svg"
+            pages[name] = section_banner(title, subtitle, 90 + len(layout))
+            layout.append([picture(name, "100%", f"{heading_case(title)}: {subtitle}")])
+            section, letter, number = title, chr(ord(letter) + 1), 0
+        elif el[0] == "article":
+            number += 1
+            seed += 1
+            art = el[1]
+            name = f"page-{letter.lower()}{number}.svg"
+            pages[name] = article_page(art, section, f"PAGE {letter}{number}", seed)
+            alt = f"Page {letter}{number}: {art.headline}. {art.deck}. The full text is in the plain-text edition below."
+            layout.append([picture(name, "100%", alt)])
+        elif el[1] == "front":
+            pages["front-page.svg"] = front_page(ed)
+            lead = ed["lead"]
+            layout.append([picture("front-page.svg", "100%", f"{ed['paper']['title']}. {ed['paper']['motto']} "
+                                   f"Lead story: {lead['headline']}. {lead['deck']}.")])
+        elif el[1] == "newsreel":
+            pages["newsreel.svg"] = newsreel(ed)
+            layout.append([picture("newsreel.gif" if gif else "newsreel.svg", "100%", ed["newsreel"]["alt"])])
+        elif el[1] in ("architecture", "pipelines"):
+            pages[f"{el[1]}.svg"] = (architecture if el[1] == "architecture" else pipelines)(ed)
+            plain_text = (plain_architecture if el[1] == "architecture" else plain_pipelines)(ed)
+            layout.append([picture(f"{el[1]}.svg", "100%", " ".join(plain_text).replace("**", "").replace("`", ""))])
+        elif el[1] == "classifieds":
+            row = []
+            for n, ad in enumerate(ads):
+                pages[f"ad-{ad.slug}.svg"] = ad_clipping(ad, n)
+                row.append(picture(f"ad-{ad.slug}.svg", "32%", f"{ad.plain}: {ad.body} {ad.contact}", ad.link))
+            layout.append(row)
+        elif el[1] == "colophon":
+            pages["colophon.svg"] = colophon(ed)
+            layout.append([picture("colophon.svg", "100%", ed["colophon"]["text"])])
+        else:
+            raise SystemExit(f"edition.md: unknown page {{{{{el[1]}}}}}")
+
     (OUT / "dark").mkdir(parents=True, exist_ok=True)
+    for stale in [*OUT.glob("*.svg"), *(OUT / "dark").glob("*.svg")]:
+        if stale.name not in pages:
+            stale.unlink()
     for name, svg in pages.items():
         (OUT / name).write_text(svg, encoding="utf-8")
         (OUT / "dark" / name).write_text(night_edition(svg), encoding="utf-8")
-    print(f"printed {len(pages)} pages to {OUT.relative_to(ROOT).as_posix()}/ (and dark/)")
+
+    out = ["<!-- Printed by docs/press/press.py from docs/press/edition.md and edition.toml. "
+           "Edit those and run the press: it overwrites this file. -->",
+           '<div align="center">', ""]
+    for row in layout:
+        out += ["\n".join(row), ""]
+    out += ["</div>", "", "<details>",
+            "<summary><b>Read the plain-text edition</b> (for screen readers, small screens, search engines and "
+            "copying commands)</summary>", "", *plain_edition(ed, elements), "", "</details>", ""]
+    README.write_text("\n".join(out), encoding="utf-8")
+    print(f"printed {len(pages)} pages to {OUT.relative_to(ROOT).as_posix()}/ (and dark/), and README.md"
+          f"{'' if gif else '; the newsreel is still: run newsreel.py to set it moving'}")
 
 
 if __name__ == "__main__":

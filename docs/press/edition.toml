@@ -1,13 +1,16 @@
 # ═══════════════════════════════════════════════════════════════════════
 #  THE FORESIGHT WING EDITION: everything printed on the README's pages.
 #
-#  A special edition from the FOSSiNtellect presses. Edit this file, then
-#  print the pages again:
+#  A special edition from the FOSSiNtellect presses. This file holds the
+#  special pages (front page, newsreel, diagrams, classifieds); the articles
+#  are in edition.md. Edit either, then print the edition again:
 #
 #      python docs/press/press.py
 #
-#  That rewrites docs/readme/*.svg (and the night edition in
-#  docs/readme/dark/). README.md is written by hand and only shows them.
+#  That rewrites docs/readme/*.svg (and the night edition in docs/readme/dark/)
+#  and README.md itself. Don't hand-edit those: the presses overwrite them.
+#  The moving newsreel (docs/readme/newsreel.gif) is printed separately, from
+#  the demo video, by docs/press/newsreel.py.
 # ═══════════════════════════════════════════════════════════════════════
 
 [paper]
@@ -17,6 +20,7 @@ motto    = "Every meeting remembered. Nothing leaves your PC."
 volume   = "VOL. I · NO. 1"
 date     = "FIRST EDITION · OCTOBER 24, 2026"
 price    = "PRICE: FREE (MIT LICENSE)"
+plain_line = "A FOSSiNtellect publication · Vol. I, No. 1 · First edition, October 24, 2026"  # the folio, in the plain-text edition
 
 [lead]
 kicker   = "NOW FOR WINDOWS"
@@ -33,7 +37,7 @@ story = [
 masthead = "my first open-source app!"
 date     = "hot off the press"
 staff    = "all on one PC"
-newsreel = "it plays just below!"
+newsreel = "live from the app, at 2× speed"
 frame    = "nothing leaves this box"
 rerank   = "94% to 100% right first try"
 
@@ -50,25 +54,22 @@ members = [
 ]
 
 [figures]
-items = ["0 accounts", "0 cloud calls", "4 on-device models", "6.6 GB, fetched once", "MIT licensed"]
+items = ["0 accounts", "0 cloud calls", "5 on-device models", "6.6 GB, fetched once", "MIT licensed"]
 
-# Section banners: [title, subtitle].
-[sections]
-newsreel     = ["THE NEWSREEL", "Two and a half minutes with the real app, on a real PC"]
-prerequisites = ["BEFORE YOU BEGIN", "Everything you need, and nothing you don’t"]
-features     = ["THE FEATURES DESK", "What it does, and where to find it"]
-install      = ["GETTING YOUR COPY", "Build the installer, or run it from source"]
-architecture = ["INSIDE THE PRESS ROOM", "How a meeting becomes notes, and a question becomes a cited answer"]
-classifieds  = ["LETTERS & CLASSIFIEDS", "Tests, contributions, security and the fine print"]
-
+# The newsreel: printed with a still photo, then animated by newsreel.py.
+# clip = [start, length] in seconds of the demo video, played at `speed`.
 [newsreel]
-kicker   = "NEWSREEL · 2 MIN 41 S"
+kicker   = "NEWSREEL · 32 S AT 2× SPEED"
 label    = "THE ACTUAL RUNNING APP"
 headline = "WATCH IT ANSWER FROM YOUR OWN FILES"
-caption  = "Sources are indexed, a question about the Atlas budget is answered with numbered citations, and a meeting is transcribed by Parakeet and written up by Gemma 4, all on one Windows PC. The documents and the meeting audio are fictional, the waits are shortened, and the recording predates the rename, so the app still calls itself Foresight for Windows."
+caption  = "A question about the Atlas budget is answered from the indexed files with numbered citations, then a meeting transcribed by Parakeet is written up by Gemma 4 as a summary and action items, all on one Windows PC. The documents and the meeting audio are fictional, the waits are shortened, and the recording predates the rename, so the app still calls itself Foresight for Windows."
 credit   = "SCREEN RECORDING, OCT. 19, 2026"
-footer   = "MP4 · 1920 × 1080 · 6.5 MB"
-action   = "WATCH THE NEWSREEL →"
+footer   = "SILENT · LOOPS ON ITS OWN"
+action   = "REAL APP, REAL MODELS, NO CLOUD"
+alt      = "Newsreel: the actual running app, at double speed. A question about the Atlas marketing budget and launch date is answered with numbered citations, then a meeting transcript is turned into enhanced notes."
+clip     = [26, 64]
+speed    = 2
+fps      = 8
 
 [architecture]
 kicker   = "THE BIG PICTURE"
@@ -127,15 +128,15 @@ lines = [
   ] },
 ]
 
-# CLASSIFIEDS: [head, sub, body, contact, link].
+# CLASSIFIEDS: [head, sub, body, contact, link, name in the plain-text edition].
 [classifieds]
 ads = [
-  ["Wanted", "CONTRIBUTORS", "Pull requests, bug reports and bold ideas. Local-first stays local; tests run offline.", "Apply within: CONTRIBUTING.md", "CONTRIBUTING.md"],
-  ["Notice", "TO SECURITY RESEARCHERS", "Found a way in from another machine or web page? Report it privately, not in an issue.", "Write in: SECURITY.md", "SECURITY.md"],
-  ["Free", "UNDER THE MIT LICENSE", "Use it, change it, share it. Just keep the copyright notice with every copy.", "The fine print: LICENSE", "LICENSE"],
+  ["Wanted", "CONTRIBUTORS", "Pull requests, bug reports and bold ideas. Local-first stays local; tests run offline.", "Apply within: CONTRIBUTING.md", "CONTRIBUTING.md", "Wanted: contributors"],
+  ["Notice", "TO SECURITY RESEARCHERS", "Found a way in from another machine or web page? Report it privately, not in an issue.", "Write in: SECURITY.md", "SECURITY.md", "Notice to security researchers"],
+  ["Free", "UNDER THE MIT LICENSE", "Use it, change it, share it. Just keep the copyright notice with every copy.", "The fine print: LICENSE", "LICENSE", "Free under the MIT license"],
 ]
 
 [colophon]
-left  = "PAGE A1"
+left  = "FORESIGHT WING"
 right = "OCT. 24, 2026"
 text  = "Printed by docs/press/press.py · Set in Old Standard TT & Caveat · Every line of source is open"
