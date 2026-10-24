@@ -583,9 +583,9 @@ def newsreel(ed: dict) -> str:
     page.box(x0, y, cw, ph, 1.4)
     page.box(x0 - 4, y - 4, cw + 8, ph + 8, 0.6)
     page.play_button(mid, y + ph / 2 - 20, 38)
-    if notes.get("newsreel"):
+    if notes.get("newsreel"):  # the player itself sits just under this page in the README
         nw = page.note(mid + 70, y + ph / 2 + 58, notes["newsreel"], 26, tilt=-4)
-        page.arrow(mid + 66, y + ph / 2 + 44, mid + 34, y + ph / 2 + 2, bend=-0.3)
+        page.arrow(mid + 70 + nw * 0.6, y + ph / 2 + 66, mid + 70 + nw * 0.75, y + ph - 14, bend=-0.25)
     y += ph + 12
     page.text(x1, y + 6, f"PHOTO: {reel['credit']}", B, 8.5, anchor="end", fill=INK_SOFT, tracking=1.2)
     y += 26
