@@ -5,7 +5,7 @@
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/dark/section-the-newsreel.svg"><img src="docs/readme/section-the-newsreel.svg" width="100%" alt="The Newsreel: Thirty-two seconds with the real app, on a real PC"></picture>
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/dark/newsreel.gif"><img src="docs/readme/newsreel.gif" width="100%" alt="Newsreel: the actual running app, at double speed. A question about the Atlas marketing budget and launch date is answered with numbered citations, then a meeting transcript is turned into enhanced notes."></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/dark/newsreel.gif"><img src="docs/readme/newsreel.gif" width="100%" alt="Newsreel: the actual running app, at double speed. An indexed source is opened, a question about the Atlas marketing budget and launch date is answered with numbered citations, then a meeting&#x27;s shorthand is turned into enhanced notes."></picture>
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/dark/section-before-you-begin.svg"><img src="docs/readme/section-before-you-begin.svg" width="100%" alt="Before You Begin: Everything you need, and nothing you don’t"></picture>
 
@@ -77,7 +77,7 @@ Gemma 4 writes the notes, EmbeddingGemma 2 finds the evidence in text, sound and
 ## The Newsreel
 *Thirty-two seconds with the real app, on a real PC*
 
-**The newsreel** (32 s at 2× speed): A question about the Atlas budget is answered from the indexed files with numbered citations, then a meeting transcribed by Parakeet is written up by Gemma 4 as a summary and action items, all on one Windows PC. The documents and the meeting audio are fictional, the waits are shortened, and the recording predates the rename, so the app still calls itself Foresight for Windows.
+**The newsreel** (32 s at 2× speed): An indexed source is opened, a question about the Atlas budget is answered with numbered citations, and a meeting transcribed by Parakeet goes from shorthand to finished notes by Gemma 4, all on one Windows PC. The documents and the meeting audio are fictional, the waits are shortened, and the recording predates the rename, so the app still calls itself Foresight for Windows.
 
 ---
 
