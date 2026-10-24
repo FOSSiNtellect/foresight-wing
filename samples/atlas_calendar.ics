@@ -1,0 +1,57 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Foresight Wing//Sample calendar//EN
+CALSCALE:GREGORIAN
+X-WR-CALNAME:Atlas sample calendar
+X-WR-CALDESC:Fictional recurring meetings for trying Daily Briefings. Times are in this PC's local time zone.
+BEGIN:VEVENT
+UID:atlas-budget-checkin@foresight.sample
+DTSTAMP:20260105T080000Z
+SUMMARY:Atlas launch budget check-in
+DTSTART:20260105T093000
+DTEND:20260105T100000
+RRULE:FREQ=DAILY
+LOCATION:Teams call
+DESCRIPTION:Confirm the final Atlas marketing budget and the public launch
+  date before the second wave of paid social.\nJoin: https://teams.example.
+ com/l/meetup-join/atlas-budget
+ORGANIZER;CN=Dana Kim:mailto:dana.kim@example.com
+ATTENDEE;CN=Dana Kim;ROLE=CHAIR:mailto:dana.kim@example.com
+ATTENDEE;CN=Priya Natarajan;ROLE=REQ-PARTICIPANT:mailto:priya.natarajan@example.com
+ATTENDEE;CUTYPE=ROOM;CN=Room 4B:mailto:room4b@example.com
+BEGIN:VALARM
+ACTION:DISPLAY
+TRIGGER:-PT10M
+DESCRIPTION:Reminder
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:atlas-design-review-prep@foresight.sample
+DTSTAMP:20260105T080000Z
+SUMMARY:Atlas design review prep with Marco
+DTSTART:20260105T110000
+DURATION:PT30M
+RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR
+LOCATION:Studio 2
+DESCRIPTION:Walk through the design review agenda and check the launch
+  timeline and app-store review risk.
+ORGANIZER;CN=Marco Ruiz:mailto:marco.ruiz@example.com
+ATTENDEE;CN=Marco Ruiz:mailto:marco.ruiz@example.com
+ATTENDEE;CN=Dana Kim:mailto:dana.kim@example.com
+END:VEVENT
+BEGIN:VEVENT
+UID:atlas-vendor-contracts@foresight.sample
+DTSTAMP:20260105T080000Z
+SUMMARY:Atlas vendor contracts
+DTSTART:20260105T150000
+DTEND:20260105T154500
+RRULE:FREQ=DAILY
+LOCATION:Teams call
+DESCRIPTION:Go through the final quotes from the shortlisted vendors
+  (printing\, launch event\, paid social) and decide which contracts need
+  approval.
+ORGANIZER;CN=Priya Natarajan:mailto:priya.natarajan@example.com
+ATTENDEE;CN=Priya Natarajan:mailto:priya.natarajan@example.com
+ATTENDEE;CN=Dana Kim:mailto:dana.kim@example.com
+END:VEVENT
+END:VCALENDAR

@@ -1,0 +1,141 @@
+# ═══════════════════════════════════════════════════════════════════════
+#  THE FORESIGHT WING EDITION: everything printed on the README's pages.
+#
+#  A special edition from the FOSSiNtellect presses. Edit this file, then
+#  print the pages again:
+#
+#      python docs/press/press.py
+#
+#  That rewrites docs/readme/*.svg (and the night edition in
+#  docs/readme/dark/). README.md is written by hand and only shows them.
+# ═══════════════════════════════════════════════════════════════════════
+
+[paper]
+flag     = "A FOSSiNtellect PUBLICATION"
+title    = "Foresight Wing"
+motto    = "Every meeting remembered. Nothing leaves your PC."
+volume   = "VOL. I · NO. 1"
+date     = "FIRST EDITION · OCTOBER 24, 2026"
+price    = "PRICE: FREE (MIT LICENSE)"
+
+[lead]
+kicker   = "NOW FOR WINDOWS"
+headline = "LOCAL AI TAKES THE MINUTES"
+deck     = "Foresight Wing listens to your calls, turns your shorthand into polished notes and answers questions from your own files, with every model running on your own PC"
+byline   = "BY THE FOSSiNtellect DESK"
+story = [
+  "A new open-source companion has arrived for Windows, and it keeps its notes to itself. Foresight Wing hears both sides of a call, your microphone and the system audio, writes a live transcript, and answers questions it hears from your own documents, with numbered citations.",
+  "Gemma 4 writes the notes, EmbeddingGemma 2 finds the evidence in text, sound and pictures, and Parakeet takes down every word. All of them run on the machine itself. There is no account and no telemetry, and the files it keeps are encrypted to your Windows account.",
+]
+
+# Handwritten in blue pen in the margins. Set one to "" to leave it out.
+[notes]
+masthead = "my first open-source app!"
+date     = "hot off the press"
+staff    = "all on one PC"
+newsreel = "click to play!"
+frame    = "nothing leaves this box"
+rerank   = "94% to 100% right first try"
+
+# ON THE STAFF: who does what.
+[staff]
+heading = "ON THE STAFF"
+members = [
+  { name = "Gemma 4 E2B",      beat = "Writes and listens" },
+  { name = "EmbeddingGemma 2", beat = "Finds the evidence" },
+  { name = "Parakeet TDT",     beat = "Takes dictation" },
+  { name = "Whisper small",    beat = "Hinglish desk" },
+  { name = "SQLite + FTS5",    beat = "The archive" },
+  { name = "AES-256-GCM",      beat = "The safe" },
+]
+
+[figures]
+items = ["0 accounts", "0 cloud calls", "4 on-device models", "6.6 GB, fetched once", "MIT licensed"]
+
+# Section banners: [title, subtitle].
+[sections]
+newsreel     = ["THE NEWSREEL", "Two and a half minutes with the real app, on a real PC"]
+prerequisites = ["BEFORE YOU BEGIN", "Everything you need, and nothing you don’t"]
+features     = ["THE FEATURES DESK", "What it does, and where to find it"]
+install      = ["GETTING YOUR COPY", "Build the installer, or run it from source"]
+architecture = ["INSIDE THE PRESS ROOM", "How a meeting becomes notes, and a question becomes a cited answer"]
+classifieds  = ["LETTERS & CLASSIFIEDS", "Tests, contributions, security and the fine print"]
+
+[newsreel]
+kicker   = "NEWSREEL · 2 MIN 41 S"
+label    = "THE ACTUAL RUNNING APP"
+headline = "WATCH IT ANSWER FROM YOUR OWN FILES"
+caption  = "Sources are indexed, a question about the Atlas budget is answered with numbered citations, and a meeting is transcribed by Parakeet and written up by Gemma 4, all on one Windows PC. The documents and the meeting audio are fictional, the waits are shortened, and the recording predates the rename, so the app still calls itself Foresight for Windows."
+credit   = "SCREEN RECORDING, OCT. 19, 2026"
+footer   = "MP4 · 1920 × 1080 · 6.5 MB"
+action   = "WATCH THE NEWSREEL →"
+
+[architecture]
+kicker   = "THE BIG PICTURE"
+headline = "ONE PC. THREE LAYERS. NO CLOUD."
+deck     = "Everything below runs on your own Windows PC, and the server only listens on 127.0.0.1"
+inputs = [
+  { title = "Microphone",     body = "your side of the call, labelled You" },
+  { title = "System audio",   body = "the other side, through WASAPI loopback" },
+  { title = "Your knowledge", body = "folders, uploads, web pages, pictures, memos" },
+  { title = "Calendars",      body = ".ics files and subscription links" },
+]
+frame = "THIS PC"
+window = { label = "1 · THE WINDOW", title = "Edge app window and tray icon", files = "foresight/static/", body = "The whole UI in plain HTML, CSS and JavaScript, with no build step and no CDN. Live events arrive over the WebSocket /ws, and long answers stream as NDJSON." }
+app_label = "2 · THE APP"
+app_note  = "ForesightWing.exe, or python run.py · FastAPI on 127.0.0.1:8765"
+desks = [
+  { title = "Speech desk",     files = "asr.py",                    body = "An energy VAD cuts 16 kHz audio into utterances of up to 15 s; Parakeet or Whisper writes them down." },
+  { title = "Live assistance", files = "assistant.py",              body = "Spots questions in the transcript and answers them from your sources as cited cards." },
+  { title = "Indexing desk",   files = "indexer.py · images.py · memos.py", body = "Parses, chunks and embeds files, pictures and voice memos; rescans folders every 10 minutes." },
+  { title = "Retrieval desk",  files = "retrieval.py · dates.py",   body = "Four ranked lists fused with Reciprocal Rank Fusion, then re-ranked by Gemma." },
+  { title = "Writing desk",    files = "rag.py · meetings.py · briefings.py · wiki.py", body = "Cited answers, enhanced notes, daily briefings and label wiki pages." },
+  { title = "The archive",     files = "db.py · vault.py",          body = "SQLite (WAL, FTS5) for text and vectors; AES-256-GCM for the files it keeps." },
+]
+models_label = "3 · THE MODELS"
+models = [
+  { title = "Ollama, on 127.0.0.1:11434", files = "llm.py", body = "Gemma 4 E2B writes, re-ranks, listens and looks. EmbeddingGemma 2 embeds text, sound and pictures in one space." },
+  { title = "Inside the app",             files = "asr.py · repass.py", body = "Parakeet TDT 0.6B v3 (ONNX Runtime), Whisper small (CTranslate2) and Silero VAD, all on the CPU." },
+]
+doors_title = "THE ONLY DOORS OUT"
+doors = "Set up now (Ollama and the two models) · web pages you save · calendar links you add. Each starts only when you ask for it."
+
+[pipelines]
+kicker   = "THREE ASSEMBLY LINES"
+headline = "FROM SOUND, WORDS AND FILES TO CITED ANSWERS"
+lines = [
+  { title = "A MEETING, FROM SOUND TO NOTES", steps = [
+    ["CAPTURE",    "Microphone (You) and WASAPI loopback (Others), 16 kHz mono."],
+    ["CUT",        "An energy VAD ends each utterance at a pause, or at 15 s."],
+    ["TRANSCRIBE", "Parakeet for English; Whisper small for Hindi and Hinglish."],
+    ["ASSIST",     "Questions heard are searched and answered as cited cards."],
+    ["ENHANCE",    "Map-reduce turns it all into Summary, Decisions and Action items."],
+  ] },
+  { title = "A QUESTION, FROM WORDS TO A CITED ANSWER", steps = [
+    ["EMBED",   "EmbeddingGemma 2 turns the question into a 768-d vector."],
+    ["SEARCH",  "Four lists: text vectors, BM25 keywords, audio moments, pictures."],
+    ["FUSE",    "Reciprocal Rank Fusion (k = 60), at most 3 hits per source."],
+    ["RE-RANK", "Gemma scores every candidate from 0 to 3 in one JSON call."],
+    ["ANSWER",  "Gemma 4 writes with [n] citations, hearing cited clips first."],
+  ] },
+  { title = "A FILE, FROM DISK TO MEMORY", steps = [
+    ["FIND",  "Watched folders, uploads and saved web pages, rescanned every 10 min."],
+    ["PARSE", "PDF, Office, ODT, RTF, EPUB, HTML and text; pictures and memos too."],
+    ["CHUNK", "About 1,200 characters, 200 overlapping; unchanged text is skipped."],
+    ["EMBED", "Text by meaning, pictures by their look, memos by their sound."],
+    ["STORE", "SQLite with float32 vectors and FTS5; kept files encrypted."],
+  ] },
+]
+
+# CLASSIFIEDS: [head, sub, body, contact, link].
+[classifieds]
+ads = [
+  ["Wanted", "CONTRIBUTORS", "Pull requests, bug reports and bold ideas. Local-first stays local; tests run offline.", "Apply within: CONTRIBUTING.md", "CONTRIBUTING.md"],
+  ["Notice", "TO SECURITY RESEARCHERS", "Found a way in from another machine or web page? Report it privately, not in an issue.", "Write in: SECURITY.md", "SECURITY.md"],
+  ["Free", "UNDER THE MIT LICENSE", "Use it, change it, share it. Just keep the copyright notice with every copy.", "The fine print: LICENSE", "LICENSE"],
+]
+
+[colophon]
+left  = "PAGE A1"
+right = "OCT. 24, 2026"
+text  = "Printed by docs/press/press.py · Set in Old Standard TT & Caveat · Every line of source is open"

@@ -1,0 +1,7 @@
+* text=auto
+*.wav binary
+*.ogg binary
+*.opus binary
+*.mp4 binary
+*.jpg binary
+*.woff2 binary

@@ -1,0 +1,35 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Caches and test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Environments
+.env
+.env.*
+.venv/
+env/
+venv/
+ENV/
+
+# IDE & Editor settings
+.claude/
+.vscode/
+.idea/
+
+# Operating System files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+# packaging/build.py output (ForesightWing.exe, ForesightWingSetup.exe, bundled models): gigabytes, never committed
+/build/
+/dist/
