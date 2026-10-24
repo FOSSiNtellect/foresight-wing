@@ -30,11 +30,18 @@ Gemma 4 writes the notes, EmbeddingGemma 2 finds the evidence in text, sound and
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/dark/section-newsreel.svg"><img src="docs/readme/section-newsreel.svg" width="100%" alt="The newsreel"></picture>
 
-<a href="docs/media/foresight-wing-demo.mp4"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/dark/newsreel.svg"><img src="docs/readme/newsreel.svg" width="100%" alt="Newsreel, 2 min 41 s: the actual running app answers a question about the Atlas budget with numbered citations. Click to play the demo video."></picture></a>
+<a href="docs/media/foresight-wing-demo.mp4?raw=true"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/dark/newsreel.svg"><img src="docs/readme/newsreel.svg" width="100%" alt="Newsreel, 2 min 41 s: the actual running app answers a question about the Atlas budget with numbered citations. Click to download the demo video."></picture></a>
 
 </div>
 
-**▶ [Watch the demo video](docs/media/foresight-wing-demo.mp4)** (MP4, 2 min 41 s, 6.5 MB). It is the real app on a real Windows PC: sources are indexed, a question is answered from them with numbered citations, and a meeting recording is transcribed by Parakeet and written up by Gemma 4. The documents and the meeting audio are fictional, the waits are shortened, and the video was recorded on October 19, 2026, before the rename, so the app still calls itself *Foresight for Windows*.
+**▶ [Download the demo video](docs/media/foresight-wing-demo.mp4?raw=true)** (MP4 with narration, 2 min 41 s, 6.5 MB). It is the real app on a real Windows PC: sources are indexed, a question is answered from them with numbered citations, and a meeting recording is transcribed by Parakeet and written up by Gemma 4. The documents and the meeting audio are fictional, the waits are shortened, and the video was recorded on October 19, 2026, before the rename, so the app still calls itself *Foresight for Windows*.
+
+<details open>
+<summary><b>Silent preview</b>: asking a question, then the meeting notes, at double speed (32 s)</summary>
+
+<img src="docs/media/foresight-wing-preview.gif" width="100%" alt="Silent preview of the demo: a question about the Atlas marketing budget and launch date is answered with numbered citations, then the meeting's transcript is turned into enhanced notes with a summary and action items.">
+
+</details>
 
 <div align="center">
 
