@@ -338,7 +338,10 @@ _RERANK_SCHEMA = {"type": "object", "required": ["scores"], "properties": {"scor
 def rerank(question: str, hits: list[Hit], k: int) -> list[Hit]:
     """Re-order fused search results with Gemma reading each passage against the question (one call), keep the best k.
 
-    Passages Gemma scores 0 are dropped when enough relevant ones remain. On any failure the fused order stands."""
+    Passages Gemma scores 0, or leaves out of its scores, are unrelated and dropped, even when that leaves none: an
+    off-topic question ("what is life") then gets no sources, rather than the least unrelated ones to summarize.
+    Similarity alone cannot tell them apart (EmbeddingGemma 2 puts every passage at 0.5 or more), Gemma can.
+    On any failure the fused order stands."""
     if len(hits) <= 1:
         return hits[:k]
     blocks = "\n\n".join(f"[{n}] {h.title}\n{h.text.strip()[:500]}" for n, h in enumerate(hits, 1))
@@ -352,9 +355,8 @@ def rerank(question: str, hits: list[Hit], k: int) -> list[Hit]:
         return hits[:k]
     if not scores:
         return hits[:k]
-    order = sorted(range(len(hits)), key=lambda i: (-scores.get(i + 1, 1), i))  # unscored passages count as 1
-    relevant = [hits[i] for i in order if scores.get(i + 1, 1) > 0]
-    return (relevant if len(relevant) >= min(3, k) else [hits[i] for i in order])[:k]
+    order = sorted(range(len(hits)), key=lambda i: (-scores.get(i + 1, 0), i))
+    return [hits[i] for i in order if scores.get(i + 1, 0) > 0][:k]
 
 
 def format_context(hits: list[Hit], max_chars: int = 9000) -> str:

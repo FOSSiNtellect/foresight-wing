@@ -941,10 +941,16 @@ def test_rerank_puts_the_answering_passage_first(monkeypatch):
     monkeypatch.setattr(llm, "chat_json", fake_json)
     assert [h.title for h in retrieval.rerank("what is the budget?", hits, 3)] == ["doc2", "doc3", "doc4"]
     assert "Question: what is the budget?" in asked[0] and "[4] doc4" in asked[0]
-    # Unrelated passages are kept only when too few relevant ones remain.
+    # Unrelated passages never pad the answer, however few relevant ones remain...
     monkeypatch.setattr(llm, "chat_json", lambda m, **kw: {"scores": [{"id": 1, "score": 0}, {"id": 2, "score": 3},
                                                                       {"id": 3, "score": 0}, {"id": 4, "score": 0}]})
-    assert [h.title for h in retrieval.rerank("q", hits, 3)] == ["doc2", "doc1", "doc3"]
+    assert [h.title for h in retrieval.rerank("q", hits, 3)] == ["doc2"]
+    # ...passages Gemma leaves out of its scores count as unrelated...
+    monkeypatch.setattr(llm, "chat_json", lambda m, **kw: {"scores": [{"id": 3, "score": 2}]})
+    assert [h.title for h in retrieval.rerank("q", hits, 3)] == ["doc3"]
+    # ...and an off-topic question ("what is life") is left with no sources at all.
+    monkeypatch.setattr(llm, "chat_json", lambda m, **kw: {"scores": [{"id": n, "score": 0} for n in range(1, 5)]})
+    assert retrieval.rerank("what is life", hits, 3) == []
     # Any failure keeps the search order.
     monkeypatch.setattr(llm, "chat_json", lambda m, **kw: {})
     assert [h.title for h in retrieval.rerank("q", hits, 2)] == ["doc1", "doc2"]
@@ -967,6 +973,24 @@ def test_chat_reranks_when_enabled(monkeypatch):
     start = next(e for e in rag.answer_stream("which passage?") if e["type"] == "start")
     assert seen == [("which passage?", settings.retrieve_k * 2, settings.retrieve_k)]
     assert start["citations"][0]["title"] == f"doc{settings.retrieve_k * 2}"  # reranked order reached the answer
+
+
+def test_off_topic_question_gets_no_sources(monkeypatch):
+    """"what is life" over meeting notes and READMEs: search always finds the least unrelated passages, and Gemma
+    used to be handed them all and summarize them. Now it gets none, and is told so."""
+    from foresight import rag
+
+    monkeypatch.setitem(runtime._load(), "rerank", True)
+    monkeypatch.setattr(retrieval, "search", lambda q, k=6, **kw: [_hit(n, f"Google Edge Foresight notes {n}")
+                                                                   for n in range(1, k + 1)])
+    monkeypatch.setattr(llm, "chat_json", lambda m, **kw: {"scores": [{"id": n, "score": 0} for n in range(1, 13)]})
+    sent = []
+    monkeypatch.setattr(llm, "chat_stream", lambda messages, **kw: sent.append(messages) or iter(["Not in your sources."]))
+    events = list(rag.answer_stream("what is life"))
+    start = next(e for e in events if e["type"] == "start")
+    assert start["citations"] == []
+    question = sent[0][-1]["content"]
+    assert "(no matching sources were found)" in question and "Google Edge Foresight" not in question
 
 
 # ---------------------------------------------------------------- date questions
